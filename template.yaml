@@ -1,0 +1,139 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  Machine learning up to date
+
+# Transform section specifies one or more macros that AWS CloudFormation uses to process your template
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/transform-section-structure.html
+Transform:
+- AWS::Serverless-2016-10-31
+
+Parameters:
+  PinpointProjectId:
+    Type: String
+    Description: Amazon Pinpoint Project ID
+  SESIdentity:
+    Type: String
+    Description: ARN of a pre-approved SES identity
+
+Resources:
+
+  # # TODO finish
+  # Campaign:
+  #   Type: AWS::Pinpoint::Campaign
+  #   Properties:
+  #     ApplicationId: PinpointProjectId
+  #     Limits:
+  #       Daily: !Ref LimitsMessagesDaily
+  #       MessagesPerSecond: !Ref LimitsMessagesPerSecond
+  #     MessageConfiguration:
+  #        EmailMessage:
+            
+  #     Name: machine-learning-up-to-date
+  #     Schedule:
+          
+  #     SegmentId: !Ref Segment
+
+  # EmailTemplate:
+  #   Type: AWS::Pinpoint::EmailTemplate
+  #   Properties:
+  #     # DefaultSubstitutions: 
+  #       # newsletterNum: 33
+  #       # TODO more variable substitutions
+  #     # TODO insert HTML body
+  #     HtmlPart: |
+  #       blah blah HTML
+  #     Subject: "Machine Learning Up-To-Date #33 📈"
+  #     TemplateName: machine-learning-up-to-date-33
+  #     TemplateDescription: machine-learning-up-to-date-33
+
+  EmailChannel:
+    Type: AWS::Pinpoint::EmailChannel
+    Properties:
+      ApplicationId: !Ref PinpointProjectId
+      Enabled: true
+      FromAddress: hello@lifewithdata.org
+      Identity: !Ref SESIdentity
+  
+  Segment:
+    Type: AWS::Pinpoint::Segment
+    Properties:
+      ApplicationId: !Ref PinpointProjectId
+      Name: Default Segment
+
+  # PinpointCampaignNotificationTopic:
+  #   Type: AWS::SNS::Topic
+  #   Properties:
+  #     DisplayName: 'PinpointCreateCampaignNotifications'
+
+  RestApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Description: REST API for managing email preferences
+      # Domain: TODO
+      Name: pinpointRestApi
+      StageName: Prod
+      MethodSettings:
+        - ResourcePath: /emailPreferences/update
+          DataTraceEnabled: true
+          MetricsEnabled: true
+          HttpMethod: PUT
+          LoggingLevel: INFO
+      TracingEnabled: true
+
+  updateEmailPreferencesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: ../src/handler.updateEmailPreferences
+      Runtime: nodejs12.x
+      MemorySize: 128
+      Timeout: 100
+      Description: Updates email preferences for a customer
+      Role: !GetAtt ManagePinpointEndpointPreferenceRole.Arn 
+      Environment:
+        Variables:
+          AWS_ACCOUNT_ID: AWS::AccountId
+          SES_IDENTITY: !Ref SESIdentity
+          PINPOINT_PROJECT_ID: !Ref PinpointProjectId
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            Method: PUT
+            Path: /emailPreferences/update
+            RestApiId: !Ref RestApi
+
+  ManagePinpointEndpointPreferenceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ManagePinpointEndpointPreferenceRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: ManageEndpointPreferencePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                  - "logs:CreateLogGroup"
+                Resource: "arm:aws:logs:*:*:*"
+
+              - Effect: Allow
+                Action:
+                  - "mobiletargeting:UpdateEndpoint"
+                  - "mobiletargeting:GetEndpoint"
+                Resource: !Sub "arn:aws:mobiletargeting:${AWS::Region}:${AWS::AccountId}:apps/${PinpointProjectId}/endpoints/*"
+
+Outputs:
+  Api:
+    Description: "API Gateway endpoint URL for deployed stage"
+    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"

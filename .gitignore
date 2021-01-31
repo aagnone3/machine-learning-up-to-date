@@ -1,3 +1,7 @@
+# @aagnone
+.env
+.aws-sam
+
 # Logs
 logs
 *.log

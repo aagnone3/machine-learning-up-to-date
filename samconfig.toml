@@ -1,0 +1,14 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "machine-learning-up-to-date"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-ua7o6byxbdnt"
+s3_prefix = "machine-learning-up-to-date"
+region = "us-east-1"
+confirm_changeset = true
+capabilities = ["CAPABILITY_IAM", "CAPABILITY_NAMED_IAM"]
+parameter_overrides = [
+    "PinpointProjectId=2d705177caca4f2bbd87005c40ac045b",
+    "SESIdentity=arn:aws:ses:us-east-1:528600220408:identity/hello@lifewithdata.org"
+]
